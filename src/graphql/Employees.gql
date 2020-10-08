@@ -1,0 +1,7 @@
+query EmployeeQuery {
+  Employee {
+    id
+    name
+    pin
+  }
+}
