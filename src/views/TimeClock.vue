@@ -49,12 +49,12 @@
           <template v-if="pinSuccess">
             <v-card-text class="justify-center">
               <h1 class="text-center text-h4 font-weight-normal">
-                Uhrzeit: {{ timeNow }}
+                {{ datenow }}
               </h1>
             </v-card-text>
             <v-card-actions class="justify-center">
               <v-spacer></v-spacer>
-              <v-btn depressed color="primary" large
+              <v-btn @click="addShift()" depressed color="primary" large
                 >Start<v-icon right>mdi-clock-start</v-icon></v-btn
               >
               <v-spacer></v-spacer>
@@ -95,7 +95,7 @@
       </v-col>
     </v-row>
 
-    <v-snackbar timeout="1000" color="success" v-model="pinSnackbar">
+    <v-snackbar timeout="2000" color="success" v-model="pinSnackbar">
       <div class="justify-center align-center">
         <h3 class="justify-center text-title font-weight-bold">
           Pin erfolgreich
@@ -108,7 +108,7 @@
         </v-btn>
       </template>
     </v-snackbar>
-    <v-snackbar timeout="1000" color="error" v-model="pinSnackbarWrong">
+    <v-snackbar timeout="2000" color="error" v-model="pinSnackbarWrong">
       <div class="justify-center align-center">
         <h3 class="justify-center text-title font-weight-bold">
           Falscher Pin
@@ -125,17 +125,22 @@
 </template>
 
 <script>
-// import gql from "graphql-tag";
+import gql from "graphql-tag";
 import GetShifts from "../graphql/GetShifts.gql";
+// import AddShift from "../graphql/AddShift.gql";
+import moment from "moment";
 export default {
-  mounted: function() {
-    this.time();
+  beforeDestroy() {
+    clearInterval(this.interval);
+  },
+  mounted() {
+    this.interval = setInterval(this.time, 1000);
   },
   methods: {
     time() {
-      // let self = this;
-      // this.timeNow = new Date.toLocaleTimeString();
-      // setTimeout(self.time, 1000);
+      this.datenow = moment()
+        .locale("de")
+        .format("LLLL");
     },
     pinCheck() {
       const pinInput = this.pinInput;
@@ -147,6 +152,7 @@ export default {
         this.pinSnackbar = true;
         this.pinSuccess = true;
       } else {
+        this.pinSnackbarWrong = true;
         console.log("Wrong PIN");
       }
     },
@@ -161,45 +167,50 @@ export default {
         console.log(resultData.Shifts[entry]);
       }
     },
-    // addEmployee() {
-    //   const Employee = {
-    //     name: this.formName,
-    //     pin: this.formPin,
-    //   };
-    //   this.formName = "";
-    //   this.formPin = "";
-    //   console.log(Employee.name);
-    //   console.log("test");
-    //   this.formNewEmployee = false;
-    //   this.$apollo.mutate({
-    //     mutation: gql`
-    //       mutation addEmployee($name: String!, $pin: Int!) {
-    //         insert_Employee(objects: { name: $name, pin: $pin }) {
-    //           returning {
-    //             name
-    //             pin
-    //           }
-    //         }
-    //       }
-    //     `,
-    //     variables: {
-    //       name: Employee.name,
-    //       pin: Employee.pin,
-    //     },
-    //     update: (store, { data: { insert_Employee } }) => {
-    //       // Read the data from our cache for this query.
-    //       const data = store.readQuery({
-    //         query: Employees_QUERY,
-    //       });
-    //       console.log(insert_Employee.returning[0]);
-    //       console.log(data);
-    //       // Add our tag from the mutation to the end
-    //       data.Employee.push(insert_Employee.returning[0]);
-    //       // Write our data back to the cache.
-    //       store.writeQuery({ query: Employees_QUERY, data });
-    //     },
-    //   });
-    // },
+    addShift() {
+      this.formName = "";
+      this.formPin = "";
+      this.formNewEmployee = false;
+      this.$apollo.mutate({
+        mutation: gql`
+          mutation AddShift($employee_id: Int!, $time_in: timestamptz!) {
+            insert_Shift(
+              objects: { employee_id_fk: $employee_id, time_in: $time_in }
+            ) {
+              returning {
+                Employee {
+                  id
+                  name
+                  pin
+                  Shifts(limit: 1, order_by: { created_at: desc }) {
+                    id
+                    time_in
+                    time_out
+                  }
+                }
+              }
+              affected_rows
+            }
+          }
+        `,
+        variables: {
+          employee_id: this.selectedEmployee.id,
+          time_in: new Date().toUTCString(),
+        },
+        update: (store, { data: { insert_Shift } }) => {
+          // Read the data from our cache for this query.
+          const data = store.readQuery({
+            query: GetShifts,
+          });
+          console.log(insert_Shift.returning[0]);
+          console.log(data);
+          // Add our tag from the mutation to the end
+          // data.Shifts.Shifts.push(insert_Shift.returning[0]);
+          // // Write our data back to the cache.
+          // store.writeQuery({ query: insert_Shift, data });
+        },
+      });
+    },
   },
   apollo: {
     // Employees: {
@@ -224,7 +235,7 @@ export default {
     pinSuccess: false,
     pinSnackbar: false,
     pinSnackbarWrong: false,
-    timeNow: "",
+    datenow: "",
   }),
 };
 </script>
