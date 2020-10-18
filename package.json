@@ -12,6 +12,9 @@
     "apollo:start": "vue-cli-service apollo:start"
   },
   "dependencies": {
+    "@auth0/auth0-spa-js": "^1.12.1",
+    "auth0": "^2.29.0",
+    "auth0-js": "^9.14.0",
     "core-js": "^3.6.5",
     "graphql-type-json": "^0.2.1",
     "lowdb": "^1.0.0",
