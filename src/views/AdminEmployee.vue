@@ -80,7 +80,14 @@
 import gql from "graphql-tag";
 import Employees_QUERY from "../graphql/Employees.gql";
 export default {
+  created() {
+    this.test();
+  },
   methods: {
+    async idToken() {
+      const token = await this.$auth.getIdTokenClaims();
+      this.idToken = token;
+    },
     addEmployee() {
       const Employee = {
         name: this.formName,
@@ -127,14 +134,19 @@ export default {
     // },
     Employee: {
       query: Employees_QUERY,
+      context: {
+        headers: {
+          Authorization: `Bearer ${this.$auth.getIdTokenClaims()}`,
+        },
+      },
     },
-    update: (data) => data.Shifts,
   },
   data: () => ({
     Employee: "",
     formNewEmployee: false,
     formName: "",
     formPin: "",
+    Shifts: "",
   }),
 };
 </script>

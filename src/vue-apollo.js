@@ -1,8 +1,10 @@
 import Vue from "vue";
 import VueApollo from "vue-apollo";
+import { getInstance } from "./auth/index.js";
+
 import {
   createApolloClient,
-  restartWebsockets
+  restartWebsockets,
 } from "vue-cli-plugin-apollo/graphql-client";
 
 // Install the vue plugin
@@ -13,7 +15,8 @@ const AUTH_TOKEN = "apollo-token";
 
 // Http endpoint
 const httpEndpoint =
-  process.env.VUE_APP_GRAPHQL_HTTP || "https://true-gannet-28.hasura.app/v1/graphql";
+  process.env.VUE_APP_GRAPHQL_HTTP ||
+  "https://true-gannet-28.hasura.app/v1/graphql";
 // Files URL root
 export const filesRoot =
   process.env.VUE_APP_FILES_ROOT ||
@@ -27,7 +30,9 @@ const defaultOptions = {
   httpEndpoint,
   // You can use `wss` for secure connection (recommended in production)
   // Use `null` to disable subscriptions
-  wsEndpoint: process.env.VUE_APP_GRAPHQL_WS || "",
+  wsEndpoint:
+    process.env.VUE_APP_GRAPHQL_WS ||
+    "ws://true-gannet-28.hasura.app/v1/graphql",
   // LocalStorage token
   tokenName: AUTH_TOKEN,
   // Enable Automatic Query persisting with Apollo Engine
@@ -36,7 +41,7 @@ const defaultOptions = {
   // You need to pass a `wsEndpoint` for this to work
   websocketsOnly: false,
   // Is being rendered on the server?
-  ssr: false
+  ssr: false,
 
   // Override default apollo link
   // note: don't override httpLink here, specify httpLink options in the
@@ -48,6 +53,11 @@ const defaultOptions = {
 
   // Override the way the Authorization header is set
   // getAuth: (tokenName) => ...
+
+  getAuth: async () => {
+    const token = await getInstance().getTokenSilently();
+    return token ? `Bearer ${token}` : "";
+  },
 
   // Additional ApolloClient options
   // apollo: { ... }
@@ -61,7 +71,7 @@ export function createProvider(options = {}) {
   // Create apollo client
   const { apolloClient, wsClient } = createApolloClient({
     ...defaultOptions,
-    ...options
+    ...options,
   });
   apolloClient.wsClient = wsClient;
 
@@ -71,7 +81,7 @@ export function createProvider(options = {}) {
     defaultOptions: {
       $query: {
         // fetchPolicy: 'cache-and-network',
-      }
+      },
     },
     errorHandler(error) {
       // eslint-disable-next-line no-console
@@ -80,7 +90,7 @@ export function createProvider(options = {}) {
         "background: red; color: white; padding: 2px 4px; border-radius: 3px; font-weight: bold;",
         error.message
       );
-    }
+    },
   });
 
   return apolloProvider;

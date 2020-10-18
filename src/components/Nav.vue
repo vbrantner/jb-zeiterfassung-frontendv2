@@ -8,7 +8,6 @@
             <v-list-item-icon>
               <v-icon v-text="item.icon"></v-icon>
             </v-list-item-icon>
-
             <v-list-item-content>
               <v-list-item-title v-text="item.text"></v-list-item-title>
             </v-list-item-content>
@@ -21,6 +20,10 @@
       <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
       <v-toolbar-title>Zeiterfassung</v-toolbar-title>
       <v-spacer></v-spacer>
+      <router-link to="/">Home</router-link>|
+      <router-link v-if="$auth.isAuthenticated" to="/profile"
+        >Profile</router-link
+      >
     </v-app-bar>
   </div>
 </template>
