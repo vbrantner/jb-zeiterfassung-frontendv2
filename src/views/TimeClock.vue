@@ -16,6 +16,7 @@
                 :items="Shifts"
                 hide-default-footer
                 disable-sort
+                :item-class="colorRow"
                 single-select
                 disable-pagination
                 @click:row="rowClick"
@@ -34,6 +35,7 @@
                 :items="Shifts"
                 hide-default-footer
                 disable-sort
+                :item-class="colorRow"
                 single-select
                 disable-pagination
                 @click:row="rowClick"
@@ -54,11 +56,21 @@
             </v-card-text>
             <v-card-actions class="justify-center">
               <v-spacer></v-spacer>
-              <v-btn @click="addShift()" depressed color="primary" large
+              <v-btn
+                :disabled="startBtnDisabled"
+                @click="addShift()"
+                depressed
+                color="primary"
+                large
                 >Start<v-icon right>mdi-clock-start</v-icon></v-btn
               >
               <v-spacer></v-spacer>
-              <v-btn depressed color="warning" large
+              <v-btn
+                @click="closeShift"
+                :disabled="outBtnDisabled"
+                depressed
+                color="warning"
+                large
                 >Ende<v-icon right>mdi-clock-end</v-icon></v-btn
               >
               <v-spacer></v-spacer>
@@ -80,6 +92,7 @@
             <v-card-actions>
               <v-btn
                 @click="pinCheck()"
+                :loading="loadingPinCheck"
                 @keypress.enter="pinCheck()"
                 @keydown.enter="pinCheck()"
                 color="success"
@@ -125,9 +138,10 @@
 </template>
 
 <script>
-import gql from "graphql-tag";
+// import gql from "graphql-tag";
 import GetShifts from "../graphql/GetShifts.gql";
-// import AddShift from "../graphql/AddShift.gql";
+import AddShift from "../graphql/AddShift.gql";
+import CloseShift from "../graphql/CloseShift.gql";
 import moment from "moment";
 export default {
   beforeDestroy() {
@@ -137,24 +151,49 @@ export default {
     this.interval = setInterval(this.time, 1000);
   },
   methods: {
+    colorRow(item) {
+      if (item.Shifts[0]) {
+        if (item.Shifts[0].time_in != null && item.Shifts[0].time_out == null) {
+          return "light-green lighten-5";
+        }
+      }
+    },
     time() {
       this.datenow = moment()
         .locale("de")
         .format("LLLL");
     },
     pinCheck() {
+      this.loadingPinCheck = true;
       const pinInput = this.pinInput;
       const userPin = this.selectedEmployee.pin;
-
-      this.pinInput = "";
-      if (pinInput == userPin) {
-        console.log("success");
-        this.pinSnackbar = true;
-        this.pinSuccess = true;
-      } else {
-        this.pinSnackbarWrong = true;
-        console.log("Wrong PIN");
-      }
+      this.$apollo.queries.Shifts.refetch().then(() => {
+        this.loadingPinCheck = false;
+        if (this.selectedEmployee.Shifts[0]) {
+          if (
+            this.selectedEmployee.Shifts[0].time_in != null &&
+            this.selectedEmployee.Shifts[0].time_out == null
+          ) {
+            this.startBtnDisabled = true;
+            this.outBtnDisabled = false;
+          } else {
+            this.startBtnDisabled = false;
+            this.outBtnDisabled = true;
+          }
+        } else {
+          this.startBtnDisabled = false;
+          this.outBtnDisabled = true;
+        }
+        this.pinInput = "";
+        if (pinInput == userPin) {
+          console.log("success");
+          this.pinSnackbar = true;
+          this.pinSuccess = true;
+        } else {
+          this.pinSnackbarWrong = true;
+          console.log("Wrong PIN");
+        }
+      });
     },
     rowClick: function(item, row) {
       row.select(!row.isSelected);
@@ -168,48 +207,36 @@ export default {
       }
     },
     addShift() {
-      this.formName = "";
-      this.formPin = "";
       this.formNewEmployee = false;
-      this.$apollo.mutate({
-        mutation: gql`
-          mutation AddShift($employee_id: Int!, $time_in: timestamptz!) {
-            insert_Shift(
-              objects: { employee_id_fk: $employee_id, time_in: $time_in }
-            ) {
-              returning {
-                Employee {
-                  id
-                  name
-                  pin
-                  Shifts(limit: 1, order_by: { created_at: desc }) {
-                    id
-                    time_in
-                    time_out
-                  }
-                }
-              }
-              affected_rows
-            }
-          }
-        `,
-        variables: {
-          employee_id: this.selectedEmployee.id,
-          time_in: new Date().toUTCString(),
-        },
-        update: (store, { data: { insert_Shift } }) => {
-          // Read the data from our cache for this query.
-          const data = store.readQuery({
-            query: GetShifts,
-          });
-          console.log(insert_Shift.returning[0]);
-          console.log(data);
-          // Add our tag from the mutation to the end
-          // data.Shifts.Shifts.push(insert_Shift.returning[0]);
-          // // Write our data back to the cache.
-          // store.writeQuery({ query: insert_Shift, data });
-        },
-      });
+      this.$apollo
+        .mutate({
+          mutation: AddShift,
+          variables: {
+            employee_id: this.selectedEmployee.id,
+            time_in: new Date().toUTCString(),
+          },
+        })
+        .then(() => {
+          this.selectedEmployee = "";
+          this.pinInput = "";
+          this.$apollo.queries.Shifts.refetch();
+        });
+    },
+    closeShift() {
+      this.closeShiftLoading = true;
+      this.$apollo
+        .mutate({
+          mutation: CloseShift,
+          variables: {
+            shift_id: this.selectedEmployee.Shifts[0].id,
+            time_out: new Date().toUTCString(),
+          },
+        })
+        .then(() => {
+          this.selectedEmployee = "";
+          this.pinInput = "";
+          this.$apollo.queries.Shifts.refetch();
+        });
     },
   },
   apollo: {
@@ -230,22 +257,28 @@ export default {
         value: "name",
       },
     ],
+    closeShiftLoading: false,
     pinInput: "",
     selectedEmployee: "",
     pinSuccess: false,
     pinSnackbar: false,
     pinSnackbarWrong: false,
     datenow: "",
+    startBtnDisabled: true,
+    outBtnDisabled: true,
+    loadingPinCheck: false,
   }),
 };
 </script>
 
 <style>
 .theme--light.v-data-table tbody tr.v-data-table__selected {
-  background: #e0e0e0 !important;
+  background: #1976d2 !important;
+  color: white;
   font-weight: 700;
 }
 .theme--light.v-data-table tbody tr.v-data-table__selected:hover {
-  background: #bdbdbd !important;
+  background: #1976d2 !important;
+  color: white;
 }
 </style>
